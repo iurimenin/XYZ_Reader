@@ -90,8 +90,12 @@ public class ArticleDetailActivity extends ActionBarActivity
             mUpButtonContainer.setOnApplyWindowInsetsListener(new View.OnApplyWindowInsetsListener() {
                 @Override
                 public WindowInsets onApplyWindowInsets(View view, WindowInsets windowInsets) {
-                    view.onApplyWindowInsets(windowInsets);
-                    mTopInset = windowInsets.getSystemWindowInsetTop();
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                        view.onApplyWindowInsets(windowInsets);
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.KITKAT_WATCH) {
+                        mTopInset = windowInsets.getSystemWindowInsetTop();
+                    }
                     mUpButtonContainer.setTranslationY(mTopInset);
                     updateUpButtonPosition();
                     return windowInsets;
@@ -119,17 +123,17 @@ public class ArticleDetailActivity extends ActionBarActivity
 
         // Select the start ID
         if (mStartId > 0) {
-            mCursor.moveToFirst();
-            // TODO: optimize
-            while (!mCursor.isAfterLast()) {
-                if (mCursor.getLong(ArticleLoader.Query._ID) == mStartId) {
-                    final int position = mCursor.getPosition();
+            cursor.moveToFirst();
+            while (!cursor.isAfterLast()) {
+                if (cursor.getLong(ArticleLoader.Query._ID) == mStartId) {
+                    final int position = cursor.getPosition();
+                    mCursor = cursor;
+                    mPagerAdapter.notifyDataSetChanged();
                     mPager.setCurrentItem(position, false);
                     break;
                 }
-                mCursor.moveToNext();
+                cursor.moveToNext();
             }
-            mStartId = 0;
         }
     }
 

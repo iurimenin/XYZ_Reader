@@ -8,5 +8,7 @@
     <string name="action_share">Share</string>
 
     <string name="up">Up</string>
+    <string name="transition_thumbnail">transition_thumbnail</string>
+    <string name="loading">Loading...</string>
 
 </resources>
