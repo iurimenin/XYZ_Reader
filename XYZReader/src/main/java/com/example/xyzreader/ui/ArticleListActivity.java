@@ -163,6 +163,7 @@ public class ArticleListActivity extends AppCompatActivity implements
         }
 
         @Override
+        @SuppressWarnings("deprecation")
         public void onBindViewHolder(ViewHolder holder, int position) {
             mCursor.moveToPosition(position);
             holder.titleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
