@@ -245,17 +245,17 @@ public class ArticleDetailFragment extends Fragment implements
     @Override
     public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
         if (verticalOffset == 0) {
-            if (mAppBarCurrentState != APPBAR_EXPANDED) {
+            if (!mAppBarCurrentState.equals(APPBAR_EXPANDED)) {
                 onStateChanged(APPBAR_EXPANDED);
             }
             mAppBarCurrentState = APPBAR_EXPANDED;
         } else if (Math.abs(verticalOffset) >= appBarLayout.getTotalScrollRange()) {
-            if (mAppBarCurrentState != APPBAR_COLLAPSED) {
+            if (!mAppBarCurrentState.equals(APPBAR_COLLAPSED)) {
                 onStateChanged(APPBAR_COLLAPSED);
             }
             mAppBarCurrentState = APPBAR_COLLAPSED;
         } else {
-            if (mAppBarCurrentState != APPBAR_IDLE) {
+            if (!mAppBarCurrentState.equals(APPBAR_IDLE)) {
                 onStateChanged(APPBAR_IDLE);
             }
             mAppBarCurrentState = APPBAR_IDLE;
