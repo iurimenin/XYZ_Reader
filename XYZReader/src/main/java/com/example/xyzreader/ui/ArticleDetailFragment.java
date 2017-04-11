@@ -5,12 +5,13 @@ import android.app.LoaderManager;
 import android.content.Intent;
 import android.content.Loader;
 import android.database.Cursor;
-import android.graphics.Color;
-import android.graphics.Rect;
 import android.graphics.Typeface;
-import android.graphics.drawable.ColorDrawable;
+import android.os.Build;
 import android.os.Bundle;
+import android.support.design.widget.AppBarLayout;
 import android.support.v4.app.ShareCompat;
+import android.support.v4.content.ContextCompat;
+import android.support.v7.widget.Toolbar;
 import android.text.Html;
 import android.text.format.DateUtils;
 import android.text.method.LinkMovementMethod;
@@ -41,31 +42,26 @@ import butterknife.OnClick;
  * tablets) or a {@link ArticleDetailActivity} on handsets.
  */
 public class ArticleDetailFragment extends Fragment implements
-        LoaderManager.LoaderCallbacks<Cursor> {
+        LoaderManager.LoaderCallbacks<Cursor>, AppBarLayout.OnOffsetChangedListener {
     private static final String TAG = "ArticleDetailFragment";
 
     public static final String ARG_ITEM_ID = "item_id";
-    private static final float PARALLAX_FACTOR = 1.25f;
+    private static final String APPBAR_EXPANDED = "APPBAR_EXPANDED";
+    private static final String APPBAR_COLLAPSED = "APPBAR_COLLAPSED";
+    private static final String APPBAR_IDLE = "APPBAR_IDLE";
 
     private Cursor mCursor;
     private long mItemId;
     private View mRootView;
     private int mMutedColor = 0xFF333333;
+    private String mAppBarCurrentState = APPBAR_IDLE;
 
     @BindView(R.id.photo) ImageView mPhotoView;
     @BindView(R.id.article_body) TextView mBodyView;
     @BindView(R.id.article_title) TextView mTitleView;
     @BindView(R.id.article_byline) TextView mBylineView;
-    @BindView(R.id.photo_container) View mPhotoContainerView;
-    @BindView(R.id.scrollview) ObservableScrollView mScrollView;
-    @BindView(R.id.draw_insets_frame_layout) DrawInsetsFrameLayout mDrawInsetsFrameLayout;
-
-    private ColorDrawable mStatusBarColorDrawable;
-
-    private int mTopInset;
-    private int mScrollY;
-    private boolean mIsCard = false;
-    private int mStatusBarFullOpacityBottom;
+    @BindView(R.id.appbar) AppBarLayout mAppBarLayout;
+    @BindView(R.id.toolbar) Toolbar mToolbar;
 
     private SimpleDateFormat dateFormat = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.sss");
     // Use default locale format
@@ -96,14 +92,7 @@ public class ArticleDetailFragment extends Fragment implements
             mItemId = getArguments().getLong(ARG_ITEM_ID);
         }
 
-        mIsCard = getResources().getBoolean(R.bool.detail_is_card);
-        mStatusBarFullOpacityBottom = getResources().getDimensionPixelSize(
-                R.dimen.detail_card_top_margin);
         setHasOptionsMenu(true);
-    }
-
-    public ArticleDetailActivity getActivityCast() {
-        return (ArticleDetailActivity) getActivity();
     }
 
     @Override
@@ -125,27 +114,9 @@ public class ArticleDetailFragment extends Fragment implements
 
         ButterKnife.bind(this, mRootView);
 
-        mDrawInsetsFrameLayout.setOnInsetsCallback(new DrawInsetsFrameLayout.OnInsetsCallback() {
-            @Override
-            public void onInsetsChanged(Rect insets) {
-                mTopInset = insets.top;
-            }
-        });
-
-        mScrollView.setCallbacks(new ObservableScrollView.Callbacks() {
-            @Override
-            public void onScrollChanged() {
-                mScrollY = mScrollView.getScrollY();
-                getActivityCast().onUpButtonFloorChanged(mItemId, ArticleDetailFragment.this);
-                mPhotoContainerView.setTranslationY((int) (mScrollY - mScrollY / PARALLAX_FACTOR));
-                updateStatusBar();
-            }
-        });
-
-        mStatusBarColorDrawable = new ColorDrawable(0);
+        mAppBarLayout.addOnOffsetChangedListener(this);
 
         bindViews();
-        updateStatusBar();
         return mRootView;
     }
 
@@ -155,35 +126,6 @@ public class ArticleDetailFragment extends Fragment implements
                 .setType("text/plain")
                 .setText("Some sample text")
                 .getIntent(), getString(R.string.action_share)));
-    }
-
-    private void updateStatusBar() {
-        int color = 0;
-        if (mPhotoView != null && mTopInset != 0 && mScrollY > 0) {
-            float f = progress(mScrollY,
-                    mStatusBarFullOpacityBottom - mTopInset * 3,
-                    mStatusBarFullOpacityBottom - mTopInset);
-            color = Color.argb((int) (255 * f),
-                    (int) (Color.red(mMutedColor) * 0.9),
-                    (int) (Color.green(mMutedColor) * 0.9),
-                    (int) (Color.blue(mMutedColor) * 0.9));
-        }
-        mStatusBarColorDrawable.setColor(color);
-        mDrawInsetsFrameLayout.setInsetBackground(mStatusBarColorDrawable);
-    }
-
-    static float progress(float v, float min, float max) {
-        return constrain((v - min) / (max - min), 0, 1);
-    }
-
-    static float constrain(float val, float min, float max) {
-        if (val < min) {
-            return min;
-        } else if (val > max) {
-            return max;
-        } else {
-            return val;
-        }
     }
 
     private Date parsePublishedDate() {
@@ -211,32 +153,49 @@ public class ArticleDetailFragment extends Fragment implements
             mRootView.animate().alpha(1);
             mTitleView.setText(mCursor.getString(ArticleLoader.Query.TITLE));
             Date publishedDate = parsePublishedDate();
+            String byLineText;
             if (!publishedDate.before(START_OF_EPOCH.getTime())) {
-                mBylineView.setText(Html.fromHtml(
-                        DateUtils.getRelativeTimeSpanString(
-                                publishedDate.getTime(),
-                                System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
-                                DateUtils.FORMAT_ABBREV_ALL).toString()
-                                + " by <font color='#ffffff'>"
-                                + mCursor.getString(ArticleLoader.Query.AUTHOR)
-                                + "</font>"));
+
+                 byLineText = DateUtils.getRelativeTimeSpanString(
+                        publishedDate.getTime(),
+                        System.currentTimeMillis(), DateUtils.HOUR_IN_MILLIS,
+                        DateUtils.FORMAT_ABBREV_ALL).toString()
+                        + " by <font color='#ffffff'>"
+                        + mCursor.getString(ArticleLoader.Query.AUTHOR)
+                        + "</font>";
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    mBylineView.setText(Html.fromHtml(byLineText, Html.FROM_HTML_MODE_LEGACY));
+                } else {
+                    mBylineView.setText(Html.fromHtml(byLineText));
+                }
 
             } else {
                 // If date is before 1902, just show the string
-                mBylineView.setText(Html.fromHtml(
-                        outputFormat.format(publishedDate) + " by <font color='#ffffff'>"
+
+                byLineText = outputFormat.format(publishedDate) + " by <font color='#ffffff'>"
                         + mCursor.getString(ArticleLoader.Query.AUTHOR)
-                                + "</font>"));
+                        + "</font>";
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    mBylineView.setText(Html.fromHtml(byLineText, Html.FROM_HTML_MODE_LEGACY));
+                } else {
+                    mBylineView.setText(Html.fromHtml(byLineText));
+                }
 
             }
-            mBodyView.setText(Html.fromHtml(mCursor.getString(ArticleLoader.Query.BODY).replaceAll("(\r\n|\n)", "<br />")));
+
+            String bodyView = mCursor.getString(ArticleLoader.Query.BODY)
+                    .replaceAll("(\r\n|\n)", "<br />");
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                mBodyView.setText(Html.fromHtml(bodyView, Html.FROM_HTML_MODE_LEGACY));
+            } else {
+                mBodyView.setText(Html.fromHtml(bodyView));
+            }
 
             Picasso.with(getActivity()).load(mCursor.getString(ArticleLoader.Query.PHOTO_URL)).into(mPhotoView, new Callback() {
                 @Override
                 public void onSuccess() {
                     mRootView.findViewById(R.id.meta_bar)
                             .setBackgroundColor(mMutedColor);
-                    updateStatusBar();
                 }
 
                 @Override
@@ -282,14 +241,46 @@ public class ArticleDetailFragment extends Fragment implements
         bindViews();
     }
 
-    public int getUpButtonFloor() {
-        if (mPhotoContainerView == null || mPhotoView.getHeight() == 0) {
-            return Integer.MAX_VALUE;
+    @Override
+    public void onOffsetChanged(AppBarLayout appBarLayout, int verticalOffset) {
+        if (verticalOffset == 0) {
+            if (mAppBarCurrentState != APPBAR_EXPANDED) {
+                onStateChanged(APPBAR_EXPANDED);
+            }
+            mAppBarCurrentState = APPBAR_EXPANDED;
+        } else if (Math.abs(verticalOffset) >= appBarLayout.getTotalScrollRange()) {
+            if (mAppBarCurrentState != APPBAR_COLLAPSED) {
+                onStateChanged(APPBAR_COLLAPSED);
+            }
+            mAppBarCurrentState = APPBAR_COLLAPSED;
+        } else {
+            if (mAppBarCurrentState != APPBAR_IDLE) {
+                onStateChanged(APPBAR_IDLE);
+            }
+            mAppBarCurrentState = APPBAR_IDLE;
         }
+    }
 
-        // account for parallax
-        return mIsCard
-                ? (int) mPhotoContainerView.getTranslationY() + mPhotoView.getHeight() - mScrollY
-                : mPhotoView.getHeight() - mScrollY;
+    private void onStateChanged(String state) {
+        switch (state) {
+            case APPBAR_EXPANDED:
+                disableCollapsingTolbar();
+                break;
+            case APPBAR_COLLAPSED:
+                enableCollapsingToolbar();
+                break;
+            case APPBAR_IDLE:
+                disableCollapsingTolbar();
+                break;
+        }
+    }
+
+    private void disableCollapsingTolbar() {
+        mToolbar.setVisibility(View.GONE);
+    }
+
+    private void enableCollapsingToolbar() {
+        mToolbar.setVisibility(View.VISIBLE);
+        mToolbar.setBackgroundColor(ContextCompat.getColor(getActivity(), R.color.colorPrimary));
     }
 }

@@ -27,4 +27,5 @@
     <color name="textColorPrimary">#212121</color>
     <color name="textColorSecondary">#757575</color>
     <color name="Divider">#BDBDBD</color>
+    <color name="white">#FFFFFF</color>
 </resources>
